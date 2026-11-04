@@ -37,6 +37,12 @@
   var seeded = load("argon_seeded", []);  // listas automaticas ya creadas una vez (no se vuelven a crear si las borras)
   var byUrl = {};
   var editingId = null, confirmDel = null, popUrl = null, pendingAdd = null;
+  var query = "";   // texto del buscador (normalizado)
+  function norm(s) {
+    s = String(s || "");
+    try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (e) {}
+    return s.toLowerCase().replace(/\s+/g, " ").trim();
+  }
 
   /* ---------- listas personalizadas ---------- */
   function findList(id) { for (var i = 0; i < ulists.length; i++) if (ulists[i].id === id) return ulists[i]; return null; }
@@ -93,6 +99,11 @@
   }
 
   function filterList() {
+    if (query) {
+      list = channels.filter(function (c) { return norm(clean(c.name)).indexOf(query) >= 0; });
+      if (gi >= list.length) gi = Math.max(0, list.length - 1);
+      return;
+    }
     var t = tabs[ti];
     if (t.id.indexOf("L:") === 0) {
       var ul = findList(t.id.slice(2));
@@ -223,10 +234,10 @@
 
   function renderGrid() {
     var box = $("grid"); box.innerHTML = "";
-    if (tabs[ti].id === "lists") { renderManager(box); return; }
+    if (!query && tabs[ti].id === "lists") { renderManager(box); return; }
     if (!list.length) {
       var e = document.createElement("div");
-      e.className = "empty"; e.textContent = emptyText();
+      e.className = "empty"; e.textContent = query ? "No encontré canales con “" + $("q").value.trim() + "”." : emptyText();
       box.appendChild(e); return;
     }
     list.forEach(function (c, i) {
@@ -245,6 +256,15 @@
       st.setAttribute("data-i", i);
       var ad = el("span", "addbtn", "+", { "data-i": i });
       g.appendChild(l); g.appendChild(r);
+      if (c.logo && /^https?:/i.test(c.logo)) {
+        d.className += " haslogo";
+        var lb = el("div", "logobox");
+        var im = el("img", null, null, { alt: "", loading: "lazy", referrerpolicy: "no-referrer" });
+        im.onerror = function () { lb.parentNode && lb.parentNode.classList.remove("haslogo"); lb.parentNode && lb.parentNode.removeChild(lb); };
+        im.src = c.logo;
+        lb.appendChild(im);
+        d.appendChild(lb);
+      }
       d.appendChild(n); d.appendChild(g); d.appendChild(st); d.appendChild(ad);
       box.appendChild(d);
     });
@@ -487,6 +507,14 @@
   /* ---------- navegacion ---------- */
   document.addEventListener("keydown", function (e) {
     var ae = document.activeElement;
+    if (ae && ae.id === "q") {                     // escribiendo en el buscador
+      var k2 = e.key, c2 = e.keyCode;
+      if (k2 === "Enter" || c2 === 13 || k2 === "ArrowDown" || c2 === 40) {
+        if (list.length) { ae.blur(); area = "grid"; gi = 0; render(); }
+        e.preventDefault();
+      } else if (k2 === "Escape" || c2 === 27 || c2 === 10009) { ae.value = ""; setQuery(""); ae.blur(); e.preventDefault(); }
+      return;
+    }
     if (ae && ae.tagName === "INPUT") {          // escribiendo el nombre de una lista
       if (e.key === "Enter" || e.keyCode === 13) { var sb = document.querySelector('[data-m="save"]'); if (sb) managerAction(sb); e.preventDefault(); }
       return;
@@ -554,6 +582,16 @@
     seeded.push("peru");
     saveLists();
   }
+
+  /* ---------- buscador ---------- */
+  function setQuery(v) {
+    query = norm(v);
+    gi = 0; area = query ? "grid" : "tabs";
+    filterList(); render();
+    setStatus(query ? (list.length + " canales encontrados para “" + v.trim() + "” · borra el texto para volver") : baseStatus);
+  }
+  $("q").addEventListener("input", function () { setQuery(this.value); });
+  $("q").addEventListener("search", function () { setQuery(this.value); });   // la x de la casilla
 
   /* ---------- carga ---------- */
   function init() {
