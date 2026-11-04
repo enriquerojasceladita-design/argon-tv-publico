@@ -347,6 +347,8 @@
     stopMedia();
     var my = token, ch = list[curIndex], v = $("video");
     var src = SERVER ? "/p?u=" + encodeURIComponent(ch.url) : ch.url;
+    // sin PC en una pagina https: los canales http:// se bloquean; se intenta su version https://
+    if (!SERVER && location.protocol === "https:" && /^http:/i.test(src)) src = src.replace(/^http:/i, "https:");
     triedNative = false;
     $("pname").textContent = clean(ch.name);
     setMsg("Cargando...");
@@ -384,7 +386,7 @@
 
     function pista() {
       if (SERVER) return "";
-      if (location.protocol === "https:" && /^http:/i.test(ch.url)) return " · este canal no tiene https: solo abre con la PC encendida";
+      if (location.protocol === "https:" && /^http:/i.test(ch.url)) return " · se intentó con https y no funcionó: este canal solo abre con la PC encendida";
       return " · puede que solo abra con la PC encendida";
     }
   }
